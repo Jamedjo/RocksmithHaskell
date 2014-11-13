@@ -19,24 +19,6 @@ data PsarcHeaderInternal = PsarcHeaderInternal { magicNumber :: Word32, header :
 readPsarcHeader :: String -> IO (Either String PsarcHeader)
 readPsarcHeader path = matchHeader <$> B.readFile path
 
-
-validFileHeader :: PsarcHeaderInternal -> Bool
-validFileHeader PsarcHeaderInternal {magicNumber=mn} = wordToString mn == "PSAR"
-  where wordToString = C.unpack . encode
-
-rejectUnless :: (a -> Bool) -> s -> a -> Either s a
-rejectUnless condition msg a
-    | condition a = Right a
-    | otherwise = Left msg
-
-validateHeader :: Either String PsarcHeaderInternal -> Either String PsarcHeader
-validateHeader headerInternal = header <$> do
-  hi <- headerInternal
-  hi <- rejectUnless validFileHeader "Not a valid Psarc file" hi
-  --hi <- rejectUnless recognizedFileVersion "Unknown psarc version" hi
-  --hi <- rejectUnless zlibCompression "Unknown compression method" hi
-  return hi -- get main header from header internal
-
 matchHeader :: B.ByteString -> Either String PsarcHeader
 matchHeader input = validateHeader (getHeaderInternal input)
 
@@ -51,3 +33,20 @@ getHeader :: Get PsarcHeaderInternal
 getHeader = do
   magicNumber <- getWord32be
   return $! PsarcHeaderInternal magicNumber PsarcHeader
+
+validateHeader :: Either String PsarcHeaderInternal -> Either String PsarcHeader
+validateHeader headerInternal = header <$> do
+  hi <- headerInternal
+  hi <- rejectUnless validFileHeader "Not a valid Psarc file" hi
+  --hi <- rejectUnless recognizedFileVersion "Unknown psarc version" hi
+  --hi <- rejectUnless zlibCompression "Unknown compression method" hi
+  return hi -- get main header from header internal
+
+rejectUnless :: (a -> Bool) -> s -> a -> Either s a
+rejectUnless condition msg a
+    | condition a = Right a
+    | otherwise = Left msg
+
+validFileHeader :: PsarcHeaderInternal -> Bool
+validFileHeader PsarcHeaderInternal {magicNumber=mn} = wordToString mn == "PSAR"
+  where wordToString = C.unpack . encode
