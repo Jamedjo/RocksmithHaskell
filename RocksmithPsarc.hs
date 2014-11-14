@@ -7,6 +7,7 @@ import Data.Binary
 import Data.Word
 import Data.Functor ((<$>))
 import Control.Applicative ((<*>))
+import System.IO.Error (tryIOError)
 
 -- Word32 is a 32bit unsigned integer
 
@@ -17,7 +18,14 @@ data PsarcHeaderInternal = PsarcHeaderInternal { magicNumber :: Word32, header :
   deriving (Show, Eq)
 
 readPsarcHeader :: String -> IO (Either String PsarcHeader)
-readPsarcHeader path = matchHeader <$> B.readFile path
+readPsarcHeader = fmap (>>= matchHeader) . tryRead
+  where
+    tryRead :: String -> IO (Either String B.ByteString)
+    tryRead path = tryIOErrorString (B.readFile path)
+    tryIOErrorString = (fmap eitherErrorToString) . tryIOError
+    eitherErrorToString :: (Show e) => Either e a -> Either String a
+    eitherErrorToString (Left e) = Left (show e)
+    eitherErrorToString (Right a) = Right a
 
 matchHeader :: B.ByteString -> Either String PsarcHeader
 matchHeader input = validateHeader (getHeaderInternal input)

@@ -18,6 +18,9 @@ dummyFile = B.pack $ [0x50, 0x53, 0x41, 0x52] ++ (zeroWords 1)
 emptyFile = B.pack $ zeroWords 2
 
 testReadPsarc psarcPath = hspec $ do
+  describe "readPsarcHeader" $ do
+    it "catches IO exceptions into Left String" $
+      readPsarcHeader "nosuchfilehere.psarcy" >>= (`shouldSatisfy` isLeft)
   describe "matchHeader" $ do
     it "extracts the psarc magic number from the file header" $
       getHeaderInternal dummyFile `shouldSatisfy` isRight
@@ -25,3 +28,4 @@ testReadPsarc psarcPath = hspec $ do
       matchHeader emptyFile `shouldBe` Left "Not a valid Psarc file"
     it "reads a PsarcHeader from valid files" $
        matchHeader dummyFile `shouldSatisfy` isRight
+    --it "rejects files with "
