@@ -1,4 +1,5 @@
 module RocksmithPsarc (
+              PsarcHeader,
               readPsarcHeader,
               matchHeader,
             ) where
@@ -32,18 +33,18 @@ octets w =
 instance Show PsarcVersion where
   show (PsarcVersion major minor) = (show major)++"."++(show minor)
 
-newtype CompressionMethod = CompressionMethod Word32
-  deriving (Show, Eq)
-
 data PsarcHeader = PsarcHeader
   {
      version :: PsarcVersion
-  ,  compressionMethod :: CompressionMethod
+  ,  compressionMethod :: String
   }
   deriving (Show, Eq)
 
+wordToString :: Word32 -> String
+wordToString = C.unpack . encode
+
 data PsarcHeaderInternal = PsarcHeaderInternal {
-    magicNumber :: Word32
+    magicNumber :: String
   , header :: PsarcHeader
   }
   deriving (Show, Eq)
@@ -78,15 +79,15 @@ getHeader = do
   numFiles <- getWord32be
   blockSize <- getWord32be
   archiveFlags <- getWord32be
-  return $! PsarcHeaderInternal magicNumber (PsarcHeader (wordToPsarcVersion version) (CompressionMethod compressionMethod))
+  return $! PsarcHeaderInternal (wordToString magicNumber) (PsarcHeader (wordToPsarcVersion version) (wordToString compressionMethod))
 
 validateHeader :: Either String PsarcHeaderInternal -> Either String PsarcHeader
 validateHeader headerInternal = header <$> do
   hi <- headerInternal
   hi <- rejectUnless validFileHeader "Not a valid Psarc file" hi
-  --hi <- rejectUnless recognizedFileVersion "Unknown psarc version" hi
-  --hi <- rejectUnless zlibCompression "Unknown compression method" hi
-  return hi -- get main header from header internal
+  hi <- rejectUnless knownFileVersion "Unknown PSARC version" hi
+  hi <- rejectUnless zlibCompression "Unknown compression method" hi
+  return hi
 
 rejectUnless :: (a -> Bool) -> s -> a -> Either s a
 rejectUnless condition msg a
@@ -94,5 +95,10 @@ rejectUnless condition msg a
     | otherwise = Left msg
 
 validFileHeader :: PsarcHeaderInternal -> Bool
-validFileHeader PsarcHeaderInternal {magicNumber=mn} = wordToString mn == "PSAR"
-  where wordToString = C.unpack . encode
+validFileHeader PsarcHeaderInternal {magicNumber=mn} = mn == "PSAR"
+
+knownFileVersion :: PsarcHeaderInternal -> Bool
+knownFileVersion PsarcHeaderInternal {header=(PsarcHeader {version=v})} = v == PsarcVersion 1 4
+
+zlibCompression :: PsarcHeaderInternal -> Bool
+zlibCompression PsarcHeaderInternal {header=(PsarcHeader {compressionMethod=c})} = c == "zlib"
