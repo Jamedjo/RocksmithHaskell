@@ -1,4 +1,7 @@
-module RocksmithPsarc where
+module RocksmithPsarc (
+              readPsarcHeader,
+              matchHeader,
+            ) where
 
 import qualified Data.ByteString.Lazy as B
 import qualified Data.ByteString.Lazy.Char8 as C
@@ -8,13 +11,41 @@ import Data.Word
 import Data.Functor ((<$>))
 import Control.Applicative ((<*>))
 import System.IO.Error (tryIOError)
+import Data.Bits (shiftR)
 
 -- Word32 is a 32bit unsigned integer
 
-data PsarcHeader = PsarcHeader
+data PsarcVersion = PsarcVersion { major :: Int, minor :: Int}
+  deriving (Eq)
+wordToPsarcVersion w = PsarcVersion (fromIntegral mj) (fromIntegral mn)
+  where mj = octets w !! 1
+        mn = octets w !! 3
+
+octets :: Word32 -> [Word8]
+octets w =
+    [ fromIntegral (w `shiftR` 24)
+    , fromIntegral (w `shiftR` 16)
+    , fromIntegral (w `shiftR` 8)
+    , fromIntegral w
+    ]
+
+instance Show PsarcVersion where
+  show (PsarcVersion major minor) = (show major)++"."++(show minor)
+
+newtype CompressionMethod = CompressionMethod Word32
   deriving (Show, Eq)
 
-data PsarcHeaderInternal = PsarcHeaderInternal { magicNumber :: Word32, header :: PsarcHeader}
+data PsarcHeader = PsarcHeader
+  {
+     version :: PsarcVersion
+  ,  compressionMethod :: CompressionMethod
+  }
+  deriving (Show, Eq)
+
+data PsarcHeaderInternal = PsarcHeaderInternal {
+    magicNumber :: Word32
+  , header :: PsarcHeader
+  }
   deriving (Show, Eq)
 
 readPsarcHeader :: String -> IO (Either String PsarcHeader)
@@ -40,7 +71,14 @@ getHeaderInternal = eitherResult . runGetOrFail getHeader
 getHeader :: Get PsarcHeaderInternal
 getHeader = do
   magicNumber <- getWord32be
-  return $! PsarcHeaderInternal magicNumber PsarcHeader
+  version <- getWord32be
+  compressionMethod <- getWord32be
+  totalTOCSize <- getWord32be
+  tocEntrySize <- getWord32be
+  numFiles <- getWord32be
+  blockSize <- getWord32be
+  archiveFlags <- getWord32be
+  return $! PsarcHeaderInternal magicNumber (PsarcHeader (wordToPsarcVersion version) (CompressionMethod compressionMethod))
 
 validateHeader :: Either String PsarcHeaderInternal -> Either String PsarcHeader
 validateHeader headerInternal = header <$> do
