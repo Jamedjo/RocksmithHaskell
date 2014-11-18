@@ -1,4 +1,4 @@
-import RocksmithPsarc
+import RocksmithPsarcHeader
 import System.Environment (getArgs)
 import System.FilePath.Glob
 import Control.Monad

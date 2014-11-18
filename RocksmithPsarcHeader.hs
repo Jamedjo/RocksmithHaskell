@@ -1,4 +1,4 @@
-module RocksmithPsarc (
+module RocksmithPsarcHeader (
               PsarcHeader,
               readPsarcHeader,
               matchHeader,
@@ -14,22 +14,15 @@ import Control.Applicative ((<*>))
 import System.IO.Error (tryIOError)
 import Data.Bits (shiftR)
 
-data PsarcVersion = PsarcVersion { major :: Int, minor :: Int}
-  deriving (Eq)
-wordToPsarcVersion w = PsarcVersion (fromIntegral mj) (fromIntegral mn)
-  where mj = octets w !! 1
-        mn = octets w !! 3
 
-octets :: Word32 -> [Word8]
-octets w =
-    [ fromIntegral (w `shiftR` 24)
-    , fromIntegral (w `shiftR` 16)
-    , fromIntegral (w `shiftR` 8)
-    , fromIntegral w
-    ]
+data PsarcHeaderInternal = PsarcHeaderInternal {
+    magicNumber :: String
+  , header :: PsarcHeader
+  }
+  deriving (Show, Eq)
 
-instance Show PsarcVersion where
-  show (PsarcVersion major minor) = (show major)++"."++(show minor)
+psarcHeaderInternalFromWords :: Word32 -> PsarcHeader -> PsarcHeaderInternal
+psarcHeaderInternalFromWords = PsarcHeaderInternal . wordToString
 
 data PsarcHeader = PsarcHeader
   {
@@ -45,14 +38,24 @@ psarcHeaderFromWords v cm af = PsarcHeader (wordToPsarcVersion v) (wordToString 
 wordToString :: Word32 -> String
 wordToString = C.unpack . encode
 
-data PsarcHeaderInternal = PsarcHeaderInternal {
-    magicNumber :: String
-  , header :: PsarcHeader
-  }
-  deriving (Show, Eq)
+data PsarcVersion = PsarcVersion { major :: Int, minor :: Int}
+  deriving (Eq)
 
-psarcHeaderInternalFromWords :: Word32 -> PsarcHeader -> PsarcHeaderInternal
-psarcHeaderInternalFromWords = PsarcHeaderInternal . wordToString
+instance Show PsarcVersion where
+  show (PsarcVersion major minor) = (show major)++"."++(show minor)
+
+wordToPsarcVersion :: Word32 -> PsarcVersion
+wordToPsarcVersion w = PsarcVersion (fromIntegral mj) (fromIntegral mn)
+  where mj = octets w !! 1
+        mn = octets w !! 3
+
+octets :: Word32 -> [Word8]
+octets w =
+    [ fromIntegral (w `shiftR` 24)
+    , fromIntegral (w `shiftR` 16)
+    , fromIntegral (w `shiftR` 8)
+    , fromIntegral w
+    ]
 
 readPsarcHeader :: String -> IO (Either String PsarcHeader)
 readPsarcHeader = fmap (>>= matchHeader) . tryRead

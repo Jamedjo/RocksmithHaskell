@@ -1,4 +1,4 @@
-import RocksmithPsarc
+import RocksmithPsarcHeader
 import Test.Hspec
 import System.Environment (getArgs, withArgs)
 import qualified Data.ByteString.Lazy as B
