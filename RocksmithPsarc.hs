@@ -14,8 +14,6 @@ import Control.Applicative ((<*>))
 import System.IO.Error (tryIOError)
 import Data.Bits (shiftR)
 
--- Word32 is a 32bit unsigned integer
-
 data PsarcVersion = PsarcVersion { major :: Int, minor :: Int}
   deriving (Eq)
 wordToPsarcVersion w = PsarcVersion (fromIntegral mj) (fromIntegral mn)
@@ -37,8 +35,12 @@ data PsarcHeader = PsarcHeader
   {
      version :: PsarcVersion
   ,  compressionMethod :: String
+  ,  archiveFlags :: Integer
   }
   deriving (Show, Eq)
+
+psarcHeaderFromWords :: (Integral af) => Word32 -> Word32 -> af -> PsarcHeader
+psarcHeaderFromWords v cm af = PsarcHeader (wordToPsarcVersion v) (wordToString cm) (fromIntegral af)
 
 wordToString :: Word32 -> String
 wordToString = C.unpack . encode
@@ -48,6 +50,9 @@ data PsarcHeaderInternal = PsarcHeaderInternal {
   , header :: PsarcHeader
   }
   deriving (Show, Eq)
+
+psarcHeaderInternalFromWords :: Word32 -> PsarcHeader -> PsarcHeaderInternal
+psarcHeaderInternalFromWords = PsarcHeaderInternal . wordToString
 
 readPsarcHeader :: String -> IO (Either String PsarcHeader)
 readPsarcHeader = fmap (>>= matchHeader) . tryRead
@@ -79,7 +84,7 @@ getHeader = do
   numFiles <- getWord32be
   blockSize <- getWord32be
   archiveFlags <- getWord32be
-  return $! PsarcHeaderInternal (wordToString magicNumber) (PsarcHeader (wordToPsarcVersion version) (wordToString compressionMethod))
+  return $! psarcHeaderInternalFromWords magicNumber (psarcHeaderFromWords version compressionMethod archiveFlags)
 
 validateHeader :: Either String PsarcHeaderInternal -> Either String PsarcHeader
 validateHeader headerInternal = header <$> do
