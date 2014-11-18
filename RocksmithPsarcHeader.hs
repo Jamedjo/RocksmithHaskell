@@ -2,6 +2,9 @@ module RocksmithPsarcHeader (
               PsarcHeader,
               readPsarcHeader,
               matchHeader,
+              HeaderResult,
+              result,
+              unconsumed,
             ) where
 
 import qualified Data.ByteString.Lazy as B
@@ -60,7 +63,7 @@ octets w =
     , fromIntegral w
     ]
 
-readPsarcHeader :: String -> IO (Either String PsarcHeader)
+readPsarcHeader :: String -> IO (Either String (HeaderResult PsarcHeader))
 readPsarcHeader = fmap (>>= matchHeader) . tryRead
   where
     tryRead :: String -> IO (Either String B.ByteString)
@@ -70,15 +73,26 @@ readPsarcHeader = fmap (>>= matchHeader) . tryRead
     eitherErrorToString (Left e) = Left (show e)
     eitherErrorToString (Right a) = Right a
 
-matchHeader :: B.ByteString -> Either String PsarcHeader
+matchHeader :: B.ByteString -> Either String (HeaderResult PsarcHeader)
 matchHeader input = validateHeader (getHeaderInternal input)
 
-getHeaderInternal :: B.ByteString -> Either String PsarcHeaderInternal
+data HeaderResult a = HeaderResult (B.ByteString, ByteOffset, a)
+  deriving (Show, Eq)
+instance Functor HeaderResult where
+  fmap f (HeaderResult (bs, bo, a)) = HeaderResult (bs, bo, f a)
+
+result :: HeaderResult a -> a
+result (HeaderResult (_,_,a)) = a
+
+unconsumed :: HeaderResult a -> B.ByteString
+unconsumed (HeaderResult (b,_,_)) = b
+
+getHeaderInternal :: B.ByteString -> Either String (HeaderResult PsarcHeaderInternal)
 getHeaderInternal = eitherResult . runGetOrFail getHeader
   where
-    eitherResult :: Either (t1, t2, a)  (t3, t4, b) -> Either a b
+    eitherResult :: Either (B.ByteString, ByteOffset, a) (B.ByteString, ByteOffset, b) -> Either a (HeaderResult b)
     eitherResult (Left (_,_,a)) = (Left a)
-    eitherResult (Right (_,_,a)) = (Right a)
+    eitherResult (Right (bs,bo,a)) = (Right (HeaderResult (bs,bo,a)))
 
 getHeader :: Get PsarcHeaderInternal
 getHeader = do
@@ -92,17 +106,17 @@ getHeader = do
   archiveFlags <- getWord32be
   return $! psarcHeaderInternalFromWords magicNumber (psarcHeaderFromWords version compressionMethod totalTOCSize numEntries blockSize archiveFlags)
 
-validateHeader :: Either String PsarcHeaderInternal -> Either String PsarcHeader
-validateHeader headerInternal = header <$> do
+validateHeader :: Either String (HeaderResult PsarcHeaderInternal) -> Either String (HeaderResult PsarcHeader)
+validateHeader headerInternal = (fmap header) <$> do
   hi <- headerInternal
   hi <- rejectUnless validFileHeader "Not a valid Psarc file" hi
   hi <- rejectUnless knownFileVersion "Unknown PSARC version" hi
   hi <- rejectUnless zlibCompression "Unknown compression method" hi
   return hi
 
-rejectUnless :: (a -> Bool) -> s -> a -> Either s a
-rejectUnless condition msg a
-    | condition a = Right a
+rejectUnless :: (a -> Bool) -> s -> HeaderResult a -> Either s (HeaderResult a)
+rejectUnless condition msg hr
+    | condition (result hr) = Right hr
     | otherwise = Left msg
 
 validFileHeader :: PsarcHeaderInternal -> Bool

@@ -2,7 +2,7 @@ import RocksmithPsarcHeader
 import Test.Hspec
 import System.Environment (getArgs, withArgs)
 import qualified Data.ByteString.Lazy as B
-import Test.Hspec.Expectations.Contrib
+import Data.Either.Unwrap
 
 main = do
   args <- getArgs
@@ -17,7 +17,9 @@ zeroWords n = zeroBytes (4*n)
 psar = [0x50, 0x53, 0x41, 0x52]
 v1p4 = [0x0, 0x1, 0x0, 0x4]
 zlib = [0x7a, 0x6c, 0x69, 0x62]
+dummyData = psar ++ v1p4 ++ zlib ++ (zeroWords 5)
 dummyFile = B.pack $ psar ++ v1p4 ++ zlib ++ (zeroWords 5)
+longDummyFile = B.pack $ dummyData ++ (zeroWords 10)
 unknownVersionFile = B.pack $ psar ++ (zeroWords 1) ++ zlib ++ (zeroWords 5)
 unknownCompressionFile = B.pack $ psar ++ v1p4 ++ (zeroWords 1) ++ (zeroWords 5)
 emptyFile = B.pack $ zeroWords 8
@@ -39,3 +41,5 @@ testReadPsarc psarcPath = hspec $ do
       matchHeader unknownVersionFile `shouldBe` Left "Unknown PSARC version"
     it "rejects files which use an unknown compression method" $
       matchHeader unknownCompressionFile `shouldBe` Left "Unknown compression method"
+    it "returns unconsumed data as a ByteString" $
+      (B.length . unconsumed . fromRight . matchHeader) longDummyFile `shouldSatisfy` (>10)
