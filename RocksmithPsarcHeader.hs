@@ -28,12 +28,15 @@ data PsarcHeader = PsarcHeader
   {
      version :: PsarcVersion
   ,  compressionMethod :: String
+  ,  tocSize :: Integer
+  ,  numEntries :: Integer
+  ,  blockSize :: Integer
   ,  archiveFlags :: Integer
   }
   deriving (Show, Eq)
 
-psarcHeaderFromWords :: (Integral af) => Word32 -> Word32 -> af -> PsarcHeader
-psarcHeaderFromWords v cm af = PsarcHeader (wordToPsarcVersion v) (wordToString cm) (fromIntegral af)
+psarcHeaderFromWords :: (Integral ts, Integral ne, Integral bs, Integral af) => Word32 -> Word32 -> ts -> ne -> bs -> af -> PsarcHeader
+psarcHeaderFromWords v cm ts ne bs af = PsarcHeader (wordToPsarcVersion v) (wordToString cm) (fromIntegral ts) (fromIntegral ne) (fromIntegral bs) (fromIntegral af)
 
 wordToString :: Word32 -> String
 wordToString = C.unpack . encode
@@ -84,10 +87,10 @@ getHeader = do
   compressionMethod <- getWord32be
   totalTOCSize <- getWord32be
   tocEntrySize <- getWord32be
-  numFiles <- getWord32be
+  numEntries <- getWord32be
   blockSize <- getWord32be
   archiveFlags <- getWord32be
-  return $! psarcHeaderInternalFromWords magicNumber (psarcHeaderFromWords version compressionMethod archiveFlags)
+  return $! psarcHeaderInternalFromWords magicNumber (psarcHeaderFromWords version compressionMethod totalTOCSize numEntries blockSize archiveFlags)
 
 validateHeader :: Either String PsarcHeaderInternal -> Either String PsarcHeader
 validateHeader headerInternal = header <$> do
