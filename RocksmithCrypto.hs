@@ -1,4 +1,4 @@
-module RocksmithRijndaelEncyptor (decryptPsarc, encryptPsarc) where
+module RocksmithCrypto (decryptPsarc, encryptPsarc) where
 
 import qualified Data.ByteString as B
 import qualified Data.Text as T

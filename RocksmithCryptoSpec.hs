@@ -1,4 +1,4 @@
-import RocksmithRijndaelEncyptor
+import RocksmithCrypto
 import Test.Hspec
 import qualified Data.ByteString as B
 
