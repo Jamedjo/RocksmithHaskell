@@ -1,4 +1,4 @@
-module RocksmithCrypto (decryptPsarc, encryptPsarc) where
+module RocksmithCrypto (decryptPsarc, encryptPsarc, decryptPsarcString, encryptPsarcString) where
 
 import qualified Data.ByteString as B
 import qualified Data.Text as T
@@ -10,12 +10,18 @@ psarcKey = B.pack [0xC5, 0x3D, 0xB2, 0x38, 0x70, 0xA1, 0xA2, 0xF7,
             0x57, 0x30, 0x9D, 0xC8, 0x52, 0x04, 0xD4, 0xC5,
             0xBF, 0xDF, 0x25, 0x09, 0x0D, 0xF2, 0x57, 0x2C]
 
-decryptPsarc :: B.ByteString -> String
-decryptPsarc = utf16ToString . rocksmithDecrypt psarcKey
+decryptPsarc :: B.ByteString -> B.ByteString
+decryptPsarc = rocksmithDecrypt psarcKey
+
+decryptPsarcString :: B.ByteString -> String
+decryptPsarcString = utf16ToString . decryptPsarc
 	where utf16ToString = T.unpack . TE.decodeUtf16LE
 
-encryptPsarc :: String -> B.ByteString
-encryptPsarc = rocksmithEncrypt psarcKey . stringToUtf16
+encryptPsarc :: B.ByteString -> B.ByteString
+encryptPsarc = rocksmithEncrypt psarcKey
+
+encryptPsarcString :: String -> B.ByteString
+encryptPsarcString = encryptPsarc . stringToUtf16
 	where stringToUtf16 = TE.encodeUtf16LE . T.pack
 
 
