@@ -1,5 +1,6 @@
 module RocksmithPsarcHeader (
               PsarcHeader,
+              indexSize,
               readPsarcHeader,
               matchHeader,
               GetResult,
@@ -32,10 +33,10 @@ data PsarcHeader = PsarcHeader
   {
      version :: PsarcVersion
   ,  compressionMethod :: String
-  ,  tocSize :: Integer
-  ,  numEntries :: Integer
-  ,  blockSize :: Integer
-  ,  archiveFlags :: Integer
+  ,  indexSize :: Int
+  ,  numEntries :: Int
+  ,  blockSize :: Int
+  ,  archiveFlags :: Int
   }
   deriving (Show, Eq)
 
