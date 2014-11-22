@@ -20,12 +20,15 @@ readPsarc path = do
 readIndexFromHeaderResult :: GetResult PsarcHeader -> (Either String (GetResult [PsarcEntry]), B.ByteString)
 readIndexFromHeaderResult hr = readIndex (result hr) decryptAndMakeIndex (unconsumed hr)
 
---need to change this to split at  * numEntries as not all of the index is entries
 readIndex :: PsarcHeader -> (B.ByteString -> a) -> B.ByteString -> (a, B.ByteString)
 readIndex header f bs = process f $ B.splitAt (fromIntegral (entriesSize header)) bs
     where
         process :: (B.ByteString -> a)-> (B.ByteString, B.ByteString) -> (a, B.ByteString)
         process f (indexData,rest) = (f indexData, rest)
+
+entriesSize :: PsarcHeader -> Int
+entriesSize header = entrySize * (numEntries header)
+  where entrySize = 30 -- size of entry in bytes
 
 decryptAndMakeIndex :: B.ByteString -> Either String (GetResult [PsarcEntry])
 decryptAndMakeIndex = makeIndex . (B.fromStrict . decryptPsarc . B.toStrict)
@@ -44,16 +47,16 @@ getListOf get = do
 
 data PsarcEntry = PsarcEntry
   { md5 :: B.ByteString
-  , zIndex :: Word32
-  , eLength :: Word64
-  , offset :: Word64
+  , zipLengthsIndex :: Word32
+  , unpackedLength :: Word64
+  , fileOffset :: Word64
   }
   deriving (Show, Eq)
 
 getEntry :: Get PsarcEntry
 getEntry = do
   md5 <- getLazyByteString 16
-  zIndex <- getWord32be
-  eLength <- getWord40beAs64
-  offset <- getWord40beAs64
-  return $! PsarcEntry md5 zIndex eLength offset
+  zipLengthsIndex <- getWord32be
+  unpackedLength <- getWord40beAs64
+  fileOffset <- getWord40beAs64
+  return $! PsarcEntry md5 zipLengthsIndex unpackedLength fileOffset
