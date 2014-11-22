@@ -14,5 +14,5 @@ main' _  = putStrLn "This test needs the path to a psarc file as an argument"
 testReadPsarc psarcPath = hspec $ do
   describe "readPsarc" $ do
     it "can read a real file" $ do
-      readPsarc psarcPath >>= (`shouldBe` Right (C.pack ""))
+      readPsarc psarcPath >>= (`shouldBe` Right [])
       --readPsarc psarcPath >>= (`shouldSatisfy` isRight)

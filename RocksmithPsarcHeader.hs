@@ -1,6 +1,7 @@
 module RocksmithPsarcHeader (
               PsarcHeader,
               indexSize,
+              entriesSize,
               readPsarcHeader,
               matchHeader,
               GetResult,
@@ -39,6 +40,8 @@ data PsarcHeader = PsarcHeader
   ,  archiveFlags :: Int
   }
   deriving (Show, Eq)
+
+entriesSize header = 30 * (numEntries header)
 
 psarcHeaderFromWords :: (Integral ts, Integral ne, Integral bs, Integral af) => Word32 -> Word32 -> ts -> ne -> bs -> af -> PsarcHeader
 psarcHeaderFromWords v cm ts ne bs af = PsarcHeader (wordToPsarcVersion v) (wordToString cm) (fromIntegral ts) (fromIntegral ne) (fromIntegral bs) (fromIntegral af)
