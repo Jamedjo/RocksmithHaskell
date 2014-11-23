@@ -1,8 +1,7 @@
 import RocksmithPsarcReader
+import RocksmithPsarcIndex
 import Test.Hspec
 import System.Environment (getArgs, withArgs)
-import qualified Data.ByteString.Char8 as C
-import Data.Either.Unwrap
 
 main = do
   args <- getArgs
