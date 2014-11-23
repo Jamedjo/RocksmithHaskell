@@ -16,7 +16,6 @@ import Data.Binary
 import Data.Word
 import Data.Functor ((<$>))
 import Control.Applicative ((<*>))
-import System.IO.Error (tryIOError)
 import Data.Bits (shiftR)
 import RocksmithPsarcHelpers
 
@@ -57,14 +56,7 @@ octets w =
     ]
 
 readPsarcHeader :: String -> IO (Either String (GetResult PsarcHeader))
-readPsarcHeader = fmap (>>= matchHeader) . tryRead
-  where
-    tryRead :: String -> IO (Either String B.ByteString)
-    tryRead path = tryIOErrorString (B.readFile path)
-    tryIOErrorString = (fmap eitherErrorToString) . tryIOError
-    eitherErrorToString :: (Show e) => Either e a -> Either String a
-    eitherErrorToString (Left e) = Left (show e)
-    eitherErrorToString (Right a) = Right a
+readPsarcHeader = runGetOnFile getHeader
 
 matchHeader :: B.ByteString -> Either String (GetResult PsarcHeader)
 matchHeader = runGetResultOrFail getHeader

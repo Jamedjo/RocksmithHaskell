@@ -3,6 +3,7 @@ module RocksmithPsarcHelpers where
 import qualified Data.ByteString.Lazy as B
 import Data.Binary
 import Data.Binary.Get
+import System.IO.Error (catchIOError)
 
 data GetResult a = GetResult (B.ByteString, ByteOffset, a)
   deriving (Show, Eq)
@@ -22,6 +23,16 @@ runGetResultOrFail g = eitherResult . runGetOrFail g
     eitherResult :: Either (B.ByteString, ByteOffset, a) (B.ByteString, ByteOffset, b) -> Either a (GetResult b)
     eitherResult (Left (_,_,a)) = (Left a)
     eitherResult (Right t) = Right (GetResult t)
+
+runGetOnFile :: Get a -> String -> IO (Either String (GetResult a))
+runGetOnFile get path = fmap (>>= runGetResultOrFail get) (tryReadFile path)
+
+tryReadFile :: String -> IO (Either String B.ByteString)
+tryReadFile = tryIO . B.readFile
+
+tryIO :: IO a -> IO (Either String a)
+tryIO f = catchIOError (f >>= return . Right) (return . Left . show)
+
 
 
 -- | Read a 40 bits of big endian data into a Word64
