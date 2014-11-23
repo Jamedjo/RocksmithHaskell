@@ -20,16 +20,6 @@ import System.IO.Error (tryIOError)
 import Data.Bits (shiftR)
 import RocksmithPsarcHelpers
 
-
-data PsarcHeaderInternal = PsarcHeaderInternal {
-    magicNumber :: String
-  , header :: PsarcHeader
-  }
-  deriving (Show, Eq)
-
-psarcHeaderInternalFromWords :: Word32 -> PsarcHeader -> PsarcHeaderInternal
-psarcHeaderInternalFromWords = PsarcHeaderInternal . wordToString
-
 data PsarcHeader = PsarcHeader
   {
      version :: PsarcVersion
@@ -77,14 +67,13 @@ readPsarcHeader = fmap (>>= matchHeader) . tryRead
     eitherErrorToString (Right a) = Right a
 
 matchHeader :: B.ByteString -> Either String (GetResult PsarcHeader)
-matchHeader input = validateHeader (getHeaderInternal input)
+matchHeader = runGetResultOrFail getHeader
 
-getHeaderInternal :: B.ByteString -> Either String (GetResult PsarcHeaderInternal)
-getHeaderInternal = runGetResultOrFail getHeader
-
-getHeader :: Get PsarcHeaderInternal
+getHeader :: Get PsarcHeader
 getHeader = do
   magicNumber <- getWord32be
+  rejectUnless validFileHeader "Not a valid Psarc file" magicNumber
+
   version <- getWord32be
   compressionMethod <- getWord32be
   totalTOCSize <- getWord32be
@@ -92,26 +81,22 @@ getHeader = do
   numEntries <- getWord32be
   blockSize <- getWord32be
   archiveFlags <- getWord32be
-  return $! psarcHeaderInternalFromWords magicNumber (psarcHeaderFromWords version compressionMethod totalTOCSize numEntries blockSize archiveFlags)
 
-validateHeader :: Either String (GetResult PsarcHeaderInternal) -> Either String (GetResult PsarcHeader)
-validateHeader headerInternal = (fmap header) <$> do
-  hi <- headerInternal
-  hi <- rejectUnless validFileHeader "Not a valid Psarc file" hi
-  hi <- rejectUnless knownFileVersion "Unknown PSARC version" hi
-  hi <- rejectUnless zlibCompression "Unknown compression method" hi
-  return hi
+  let header = psarcHeaderFromWords version compressionMethod totalTOCSize numEntries blockSize archiveFlags
+  rejectUnless knownFileVersion "Unknown PSARC version" header
+  rejectUnless zlibCompression "Unknown compression method" header
+  return $! header
 
-rejectUnless :: (a -> Bool) -> s -> GetResult a -> Either s (GetResult a)
+rejectUnless :: (a -> Bool) -> String -> a -> Get ()
 rejectUnless condition msg hr
-    | condition (result hr) = Right hr
-    | otherwise = Left msg
+    | condition hr = return ()
+    | otherwise = fail msg
 
-validFileHeader :: PsarcHeaderInternal -> Bool
-validFileHeader PsarcHeaderInternal {magicNumber=mn} = mn == "PSAR"
+validFileHeader :: Word32 -> Bool
+validFileHeader = (== "PSAR") . wordToString
 
-knownFileVersion :: PsarcHeaderInternal -> Bool
-knownFileVersion PsarcHeaderInternal {header=(PsarcHeader {version=v})} = v == PsarcVersion 1 4
+knownFileVersion :: PsarcHeader -> Bool
+knownFileVersion PsarcHeader {version=v} = v == PsarcVersion 1 4
 
-zlibCompression :: PsarcHeaderInternal -> Bool
-zlibCompression PsarcHeaderInternal {header=(PsarcHeader {compressionMethod=c})} = c == "zlib"
+zlibCompression :: PsarcHeader -> Bool
+zlibCompression PsarcHeader {compressionMethod=c} = c == "zlib"
