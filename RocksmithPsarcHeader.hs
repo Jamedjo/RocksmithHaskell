@@ -4,6 +4,7 @@ module RocksmithPsarcHeader (
               numEntries,
               readPsarcHeader,
               matchHeader,
+              getHeader,
               GetResult,
               result,
               unconsumed,

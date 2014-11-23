@@ -9,41 +9,47 @@ import Control.Monad
 import Data.Binary
 import Data.Binary.Get
 
-readPsarc :: String -> IO (Either String [PsarcEntry])
-readPsarc path = do
-  headerOrError <- readPsarcHeader path
-  return (do
-      header <- headerOrError
-      gr <- fst (readIndexFromHeaderResult header)
-      return (result gr))
+data Psarc = Psarc
+  { header :: PsarcHeader
+  , index :: PsarcIndex
+  }
 
-readIndexFromHeaderResult :: GetResult PsarcHeader -> (Either String (GetResult [PsarcEntry]), B.ByteString)
-readIndexFromHeaderResult hr = readIndex (result hr) decryptAndMakeIndex (unconsumed hr)
+data PsarcIndex = PsarcIndex
+  { entries :: [PsarcEntry]
+  , zipLengths :: B.ByteString
+  }
 
-readIndex :: PsarcHeader -> (B.ByteString -> a) -> B.ByteString -> (a, B.ByteString)
-readIndex header f bs = process f $ B.splitAt (fromIntegral (entriesSize header)) bs
-    where
-        process :: (B.ByteString -> a)-> (B.ByteString, B.ByteString) -> (a, B.ByteString)
-        process f (indexData,rest) = (f indexData, rest)
+readPsarc :: String -> IO (Either String Psarc)
+readPsarc path = (fmap.fmap) result (runGetOnFile getPsarc path)
+
+matchPsarc :: B.ByteString -> Either String (GetResult Psarc)
+matchPsarc = runGetResultOrFail getPsarc
+
+getPsarc :: Get Psarc
+getPsarc = do
+  header <- getHeader
+  index <- getIndex header
+  return (Psarc header index)
+
+getIndex :: PsarcHeader -> Get PsarcIndex
+getIndex ph = do
+  encryptedIndex <- getByteString (indexSize ph)
+  let indexData = B.fromStrict (decryptPsarc encryptedIndex)
+  let index = runGet (getIndexFromUnencrypted ph) indexData
+  return index
+
+getIndexFromUnencrypted :: PsarcHeader -> Get PsarcIndex
+getIndexFromUnencrypted ph = do
+  entries <- getListOfN (numEntries ph) getEntry
+  zipLengths <- getRemainingLazyByteString --getLazyByteString (fromIntegral ((indexSize ph) - (entriesSize ph)))
+  return (PsarcIndex entries zipLengths)
 
 entriesSize :: PsarcHeader -> Int
 entriesSize header = entrySize * (numEntries header)
   where entrySize = 30 -- size of entry in bytes
 
-decryptAndMakeIndex :: B.ByteString -> Either String (GetResult [PsarcEntry])
-decryptAndMakeIndex = makeIndex . (B.fromStrict . decryptPsarc . B.toStrict)
-
-makeIndex :: B.ByteString -> Either String (GetResult [PsarcEntry])
-makeIndex = runGetResultOrFail $ getListOf getEntry
-
-getListOf :: Get a -> Get [a]
-getListOf get = do
-  empty <- isEmpty
-  if empty
-     then return []
-     else do el <- get
-             rest <- getListOf get
-             return (el : rest)
+getListOfN :: Int -> Get a -> Get [a]
+getListOfN = replicateM
 
 data PsarcEntry = PsarcEntry
   { md5 :: B.ByteString
