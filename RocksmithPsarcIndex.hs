@@ -10,7 +10,7 @@ import Control.Monad
 
 data PsarcIndex = PsarcIndex
   { entries :: [PsarcEntry]
-  , zipLengths :: B.ByteString
+  , zipLengths :: [Word16]
   }
 
 getIndex :: PsarcHeader -> Get PsarcIndex
@@ -23,12 +23,17 @@ getIndex ph = do
 getIndexFromUnencrypted :: PsarcHeader -> Get PsarcIndex
 getIndexFromUnencrypted ph = do
   entries <- getListOfN (numEntries ph) getEntry
-  zipLengths <- getRemainingLazyByteString --getLazyByteString (fromIntegral ((indexSize ph) - (entriesSize ph)))
+  zipLengths <- getRemainingAsListOf getWord16be
   return (PsarcIndex entries zipLengths)
-
-entriesSize :: PsarcHeader -> Int
-entriesSize header = entrySize * (numEntries header)
-  where entrySize = 30 -- size of entry in bytes
 
 getListOfN :: Int -> Get a -> Get [a]
 getListOfN = replicateM
+
+getRemainingAsListOf :: Get a -> Get [a]
+getRemainingAsListOf get = do
+  empty <- isEmpty
+  if empty
+     then return []
+     else do el <- get
+             rest <- getRemainingAsListOf get
+             return (el : rest)
