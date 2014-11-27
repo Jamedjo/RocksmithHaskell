@@ -1,16 +1,44 @@
+import RocksmithPsarcEntry
 import RocksmithPsarcIndex
 import Test.Hspec
+import Codec.Compression.Zlib (compress)
+import qualified Data.ByteString.Lazy as B
+import qualified Data.ByteString.Lazy.Char8 as C
+
 
 main = hspec $ do
   describe "selectZipLengths" $ do
     it "uses indicies to group elements" $
       map length (selectZipLengths indices testZipLengths) `shouldBe` [1,1,2,2,8,1,17]
+    it "gets the right indicies for dummy data" $
+      selectZipLengths fileIndicies (zls fileData) `shouldBe` (map.map) (fromIntegral . B.length) fileDataGroups
+
+  describe "buildIndexFromRaw" $ do
+    it "extracts a list of file names" $
+      head (getFilenames buildIndex) `shouldBe` C.pack "happy.sng"
+    it "passes correct indices to entries and joins them" $
+      splitAt 1 (map (extractEntry (B.concat fileData) 64) (getEntries buildIndex)) `shouldBe` ([B.concat [entry2a, entry2b]], [entry3])
+  where
+    buildIndex = buildHelper entries fileData
+      where entries = map (uncurry entryDouble) $ zip fileIndicies fileOffsets
+    fileData = concat fileDataGroups
+    fileDataGroups = [[filenames], [entry2a, entry2b], [entry3]]
+    fileIndicies = scanSumLength length fileDataGroups
+    fileOffsets = scanSumLength (B.length . B.concat) fileDataGroups
+    scanSumLength f gs = init $ scanl (+) 0 $ map (fromIntegral . f) gs
+    filenames = compress $ C.pack "happy.sng\nhappy.json\nred-green.txt\nimage.dds"
+    entry2a = C.pack "Just som"
+    entry2b = C.pack "e dummy data."
+    entry3 = C.pack "{'success':'true'}"
+
+entryDouble i off = PsarcEntryRaw B.empty i 0 off
+buildHelper :: [PsarcEntryRaw] -> [B.ByteString] -> PsarcIndex
+buildHelper es bs = buildIndexFromRaw (B.concat bs) 64 $ PsarcIndexRaw es (zls bs)
+zls = map $ fromIntegral . B.length
+getFilenames (PsarcIndex _ fs) = fs
+getEntries  (PsarcIndex es _) = es
 
 --it should deal with seek failure
 
 indices = [0,1,2,4,6,14,15]
 testZipLengths = [268,216,63111,25719,11772,6392,0,0,0,0,0,0,0,10375,6,1298,47710,33971,21069,836,48571,31664,35850,38708,64697,27832,52268,30868,46682,23672,45556,56315]
-
---[(0,1),(1,1),(2,2),(4,2),(6,8),(14,1),(15,17)]
---[(268,0),(216,16),(63111,17),(25719,18),(11772,19),(6392,20),(0,67),(0,68),(0,69),(0,70),(0,71),(0,72),(0,73),(10375,74),(6,75),(1298,76),(47710,77),(33971,78),(21069,79),(836,80),(48571,81),(31664,82),(35850,83),(38708,84),(64697,85),(27832,86),(52268,87),(30868,88),(46682,89),(23672,90),(45556,91),(56315,92)]
---[(268,0),(216,1),(63111,2),(25719,3),(11772,4),(6392,5),(0,6),(0,7),(0,8),(0,9),(0,10),(0,11),(0,12),(10375,13),(6,14),(1298,15),(47710,16),(33971,17),(21069,18),(836,19),(48571,20),(31664,21),(35850,22),(38708,23),(64697,24),(27832,25),(52268,26),(30868,27),(46682,28),(23672,29),(45556,30),(56315,31)]

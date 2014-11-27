@@ -18,14 +18,22 @@ zipLengths (PsarcIndexRaw _ zls) = zls
 
 data PsarcIndex = PsarcIndex [PsarcEntryWithZipLengths] [C.ByteString]
 
-buildIndexFromRaw :: Int -> PsarcIndexRaw -> Handle -> IO PsarcIndex
-buildIndexFromRaw maxBlockSize (PsarcIndexRaw rawEntries zipLengths) h =
-  indexFromEntries $ entriesWithZipLengths rawEntries zipLengths
+hBuildIndexFromRaw :: Handle -> Int -> PsarcIndexRaw -> IO PsarcIndex
+hBuildIndexFromRaw h maxBlockSize = build . entriesWithZipLengths
   where
-    indexFromEntries :: [PsarcEntryWithZipLengths]  -> IO PsarcIndex
-    indexFromEntries (filenameEntry:entries) = extractFilenames filenameEntry >>= return . PsarcIndex entries
-    extractFilenames :: PsarcEntryWithZipLengths -> IO [C.ByteString]
-    extractFilenames filenameEntry = fmap C.lines $ hExtractEntry h maxBlockSize filenameEntry
+    build (filenameEntry:entries) = do
+      filenames <- hExtractEntry h maxBlockSize filenameEntry
+      return (PsarcIndex entries (C.lines filenames))
+
+buildIndexFromRaw :: B.ByteString -> Int -> PsarcIndexRaw -> PsarcIndex
+buildIndexFromRaw fileData maxBlockSize = build . entriesWithZipLengths
+  where
+    build (filenameEntry:entries) = PsarcIndex entries (C.lines (fileFn filenameEntry))
+    fileFn = extractEntry fileData maxBlockSize
+
+entriesWithZipLengths :: PsarcIndexRaw -> [PsarcEntryWithZipLengths]
+entriesWithZipLengths (PsarcIndexRaw ents zipLs) = zip ents (selectZipLengths indices zipLs)
+  where indices = map zipLengthsIndex ents
 
 getIndexRaw :: PsarcHeader -> Get PsarcIndexRaw
 getIndexRaw ph = do
@@ -52,17 +60,13 @@ getRemainingAsListOf get = do
              rest <- getRemainingAsListOf get
              return (el : rest)
 
-entriesWithZipLengths :: [PsarcEntryRaw] -> [Word16] -> [(PsarcEntryRaw, [Word16])]
-entriesWithZipLengths ents zipLs = zip ents (selectZipLengths indices zipLs)
-  where
-    indices = map zipLengthsIndex ents
-
 -- Select a range of zipLengths starting at index and adding up to at least the desired unpacked length
 selectZipLengths :: (Integral i) => [i] -> [a] -> [[a]]
-selectZipLengths indices as = splitPlaces lengths as
+selectZipLengths is as = szl is as 0
   where
-    lengths = let firsts = map fromIntegral $ compareConsecutive (flip (-)) indices
-              in firsts ++ [((length as) - (sum firsts))]
-    compareConsecutive :: (a -> a -> b) -> [a] -> [b]
-    compareConsecutive f ls = map (uncurry f) $ zip <*> tail $ ls
-
+    szl :: (Integral i) => [i] -> [a] -> Int -> [[a]]
+    szl _ [] _ = []:[]
+    szl [] as _ = as:[]
+    szl (0:is) as p = szl is as p
+    szl (i:is) as p = let (xs,ys) = splitAt ((fromIntegral i)-p) as
+                        in xs : (szl is ys (p+(length xs)))

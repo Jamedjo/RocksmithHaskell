@@ -29,7 +29,7 @@ readPsarc path = readPsarcRaw path >>= eitherInIo (addFilenames path)
 
 addFilenames :: String -> PsarcRaw -> IO Psarc
 addFilenames path p = withFile path ReadMode $ pFromRaw path (header p) (index p)
-pFromRaw path hdr idx h = buildIndexFromRaw (blockSize hdr) idx h >>= return . (Psarc hdr)
+pFromRaw path hdr idx h = hBuildIndexFromRaw h (blockSize hdr) idx >>= return . (Psarc hdr)
 
 readPsarcRaw :: String -> IO (Either String PsarcRaw)
 readPsarcRaw path = (fmap.fmap) result (runGetOnFile getPsarcRaw path)
