@@ -15,7 +15,7 @@ data PsarcEntryRaw = PsarcEntryRaw
   }
   deriving (Show, Eq)
 
-data PsarcEntryWithZipLengths = PsarcEntryWithZipLengths PsarcEntryRaw [Word16]
+type PsarcEntryWithZipLengths = (PsarcEntryRaw, [Word16])
 
 --data PsarcEntry = PsarcEntry (Maybe String) PsarcEntryRaw [Word16]
 --contents :: PsarcEntry -> cacheFunction -> ByteString
@@ -30,31 +30,29 @@ getEntry = do
 
 -- | Extracts an entry from the psarc file. If this file has been compressed with
 -- zlib, then it will be slow. If you plan to reuse this data you should cache it.
-extractEntry :: Handle -> Int -> PsarcEntryWithZipLengths -> IO B.ByteString
-extractEntry h maxBlockSize (PsarcEntryWithZipLengths entry zipLengths) = fmap B.concat $ mapM (extractBlock h) tuples
-  where
-    tuples :: [(Int,Int, Word16)]
-    tuples = zipWith3 offsetTuple (offsets realBlockSizes) realBlockSizes zipLengths
-    realBlockSizes = map realBlockSize zipLengths
-    offsetTuple offset rbs b = (offset, rbs,  b)
-    offsets :: (Integral a) =>[a] -> [a]
-    offsets = scanl (+) (fromIntegral (fileOffset entry))
-    realBlockSize :: (Integral l) => l -> Int
-    realBlockSize l = if l==0 then maxBlockSize else (fromIntegral l)
+hExtractEntry :: Handle -> Int -> PsarcEntryWithZipLengths -> IO B.ByteString
+hExtractEntry h maxBlockSize (entry, zipLengths) = do
+  hSeek h AbsoluteSeek (fromIntegral (fileOffset entry) )
+  rawData <- B.hGet h (fromIntegral blockSizeSum)
+  return $! extractEntryAtOffset rawData maxBlockSize (entry, zipLengths)
+  where blockSizeSum = sum $ map (realBlockSize maxBlockSize) zipLengths
 
-extractBlock :: (Integral b) => Handle -> (Int,Int,b) -> IO B.ByteString
-extractBlock h (offset, blockSize, storedBlockSize) = do
-  hSeek h AbsoluteSeek (fromIntegral offset)
-  rawData <- B.hGet h (fromIntegral blockSize)
-  return $! process storedBlockSize rawData
+extractEntry :: B.ByteString -> Int -> PsarcEntryWithZipLengths -> B.ByteString
+extractEntry input maxBs entry = extractEntryAtOffset (B.drop ((fromIntegral . fileOffset . fst) entry) input) maxBs entry
+
+extractEntryAtOffset :: B.ByteString -> Int -> PsarcEntryWithZipLengths -> B.ByteString
+extractEntryAtOffset input maxBs (entry, zipLengths) = B.concat $ map process $ fixSizes takeChunks
   where
-    process sbs d = (processFn sbs d) d
-    processFn :: (Integral a) => a -> B.ByteString -> (B.ByteString -> B.ByteString)
-    processFn storedBlockSize d
-      | storedBlockSize == 0 = id
-      | isZlib d = decompress
-      | otherwise = id
+    takeChunks = reverse . fst . (foldl stateSplit ([], input))
+    stateSplit (acc, state) zl = (\(x, newstate) -> ((x:acc), newstate)) $ B.splitAt (fromIntegral zl) state
+    fixSizes f = zip zipLengths $ f $ map (realBlockSize maxBs) zipLengths
+    process ::  (Word16, B.ByteString) -> B.ByteString
+    process (storedBlockSize, d)
+      | storedBlockSize == 0 = d
+      | isZlib d = decompress d
+      | otherwise = d
     isZlib :: B.ByteString -> Bool
-    isZlib d = (B.pack [0x78, 0xDA]) == (B.take 2 d)
+    isZlib d = (0x78 == (B.head d)) && ((runGet getWord16be $ B.take 2 d) `mod` 31) == 0
 
-
+realBlockSize :: (Integral l) => Int -> l -> Int
+realBlockSize maxBs l = if l==0 then maxBs else (fromIntegral l)
