@@ -2,6 +2,7 @@ module RocksmithPsarcHeader (
               PsarcHeader,
               indexSize,
               numEntries,
+              blockSize,
               readPsarcHeader,
               matchHeader,
               getHeader,
