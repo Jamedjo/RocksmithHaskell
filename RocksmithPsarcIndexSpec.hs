@@ -5,7 +5,6 @@ import Codec.Compression.Zlib (compress)
 import qualified Data.ByteString.Lazy as B
 import qualified Data.ByteString.Lazy.Char8 as C
 
-
 main = hspec $ do
   describe "selectZipLengths" $ do
     it "uses indicies to group elements" $
@@ -35,8 +34,8 @@ entryDouble i off = PsarcEntryRaw B.empty i 0 off
 buildHelper :: [PsarcEntryRaw] -> [B.ByteString] -> PsarcIndex
 buildHelper es bs = buildIndexFromRaw (B.concat bs) 64 $ PsarcIndexRaw es (zls bs)
 zls = map $ fromIntegral . B.length
-getFilenames (PsarcIndex _ fs) = fs
-getEntries  (PsarcIndex es _) = es
+getFilenames = map filename
+getEntries = map entry
 
 --it should deal with seek failure
 

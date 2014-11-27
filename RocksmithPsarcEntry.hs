@@ -17,7 +17,9 @@ data PsarcEntryRaw = PsarcEntryRaw
 
 type PsarcEntryWithZipLengths = (PsarcEntryRaw, [Word16])
 
---data PsarcEntry = PsarcEntry (Maybe String) PsarcEntryRaw [Word16]
+type PsarcEntry = (B.ByteString, PsarcEntryWithZipLengths)
+filename = fst
+entry = snd
 --contents :: PsarcEntry -> cacheFunction -> ByteString
 
 getEntry :: Get PsarcEntryRaw

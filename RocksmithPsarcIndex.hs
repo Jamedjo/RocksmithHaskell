@@ -16,19 +16,21 @@ data PsarcIndexRaw = PsarcIndexRaw [PsarcEntryRaw] [Word16]
 rawEntries (PsarcIndexRaw es _) = es
 zipLengths (PsarcIndexRaw _ zls) = zls
 
-data PsarcIndex = PsarcIndex [PsarcEntryWithZipLengths] [C.ByteString]
+type PsarcIndex = [PsarcEntry]
+buildPsarcIndex :: [PsarcEntryWithZipLengths] -> [C.ByteString] -> [PsarcEntry]
+buildPsarcIndex es fs = zip fs es
 
 hBuildIndexFromRaw :: Handle -> Int -> PsarcIndexRaw -> IO PsarcIndex
 hBuildIndexFromRaw h maxBlockSize = build . entriesWithZipLengths
   where
     build (filenameEntry:entries) = do
       filenames <- hExtractEntry h maxBlockSize filenameEntry
-      return (PsarcIndex entries (C.lines filenames))
+      return (buildPsarcIndex entries (C.lines filenames))
 
 buildIndexFromRaw :: B.ByteString -> Int -> PsarcIndexRaw -> PsarcIndex
 buildIndexFromRaw fileData maxBlockSize = build . entriesWithZipLengths
   where
-    build (filenameEntry:entries) = PsarcIndex entries (C.lines (fileFn filenameEntry))
+    build (filenameEntry:entries) = buildPsarcIndex entries (C.lines (fileFn filenameEntry))
     fileFn = extractEntry fileData maxBlockSize
 
 entriesWithZipLengths :: PsarcIndexRaw -> [PsarcEntryWithZipLengths]
