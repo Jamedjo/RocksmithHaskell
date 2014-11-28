@@ -1,9 +1,8 @@
 import RocksmithPsarcHeader
-import System.Environment (getArgs)
-import System.FilePath.Glob
+import RocksmithPsarcHelpers
 import Control.Monad
 
-main = getArgs >>= fmap join . mapM glob >>= mapM_ printPathAndHeader
+main = globMapArgs printPathAndHeader
 
 printPathAndHeader :: String -> IO ()
 printPathAndHeader path = putStrLn path >> (readAndPrintHeader path) >> putStrLn ""

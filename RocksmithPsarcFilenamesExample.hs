@@ -1,11 +1,8 @@
 import RocksmithPsarcReader
-import System.Environment (getArgs)
-import System.FilePath.Glob
+import RocksmithPsarcHelpers
 import Control.Monad
 
 main = globMapArgs printFilenames
-
-globMapArgs f = getArgs >>= fmap join . mapM glob >>= mapM_ f
 
 printFilenames :: String -> IO ()
 printFilenames path = do

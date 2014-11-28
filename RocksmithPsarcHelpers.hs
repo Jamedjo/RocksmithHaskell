@@ -4,6 +4,11 @@ import qualified Data.ByteString.Lazy as B
 import Data.Binary
 import Data.Binary.Get
 import System.IO.Error (catchIOError)
+import System.Environment (getArgs)
+import System.FilePath.Glob (glob)
+
+globMapArgs f = globArgs >>= mapM_ f
+globArgs = getArgs >>= fmap concat . mapM glob
 
 data GetResult a = GetResult (B.ByteString, ByteOffset, a)
   deriving (Show, Eq)

@@ -3,11 +3,9 @@ import RocksmithPsarcEntry
 import qualified Data.ByteString.Lazy as B
 import qualified Data.ByteString.Lazy.Char8 as C
 import System.Environment (getArgs)
-import System.FilePath.Glob
 import Control.Monad
 import Control.Monad.Error
 import Data.List
-import System.IO (stderr, hPutStrLn)
 
 printErrIO :: ErrorT String IO C.ByteString -> IO ()
 printErrIO et = runErrorT et >>= (either (hPutStrLn stderr) C.putStrLn)
