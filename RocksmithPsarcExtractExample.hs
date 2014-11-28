@@ -1,5 +1,6 @@
 import RocksmithPsarcReader
 import RocksmithPsarcEntry
+import RocksmithPsarcHelpers
 import qualified Data.ByteString.Lazy as B
 import qualified Data.ByteString.Lazy.Char8 as C
 import System.Environment (getArgs)
@@ -7,12 +8,9 @@ import Control.Monad
 import Control.Monad.Error
 import Data.List
 
-printErrIO :: ErrorT String IO C.ByteString -> IO ()
-printErrIO et = runErrorT et >>= (either (hPutStrLn stderr) C.putStrLn)
-
-main = printErrIO $ do
+main = printErrorOrByteString $ do
   path <- ErrorT getPath
-  p <- ErrorT $ readPsarc path
+  p <- readPsarc path
   firstJson <- ErrorT . return $ getFirstJson p
   liftIO $ fExtractEntry path p firstJson
 

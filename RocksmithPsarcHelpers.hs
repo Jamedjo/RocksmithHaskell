@@ -1,14 +1,24 @@
 module RocksmithPsarcHelpers where
 
 import qualified Data.ByteString.Lazy as B
+import qualified Data.ByteString.Lazy.Char8 as C
 import Data.Binary
 import Data.Binary.Get
 import System.IO.Error (catchIOError)
 import System.Environment (getArgs)
 import System.FilePath.Glob (glob)
+import System.IO (stderr, hPutStrLn)
+import Control.Monad.Error
 
 globMapArgs f = globArgs >>= mapM_ f
 globArgs = getArgs >>= fmap concat . mapM glob
+
+printErrorT :: (e -> IO ()) -> (a -> IO ()) -> ErrorT e IO a -> IO ()
+printErrorT l r et = runErrorT et >>= (either l r)
+printErrorOrByteString :: ErrorT String IO C.ByteString -> IO ()
+printErrorOrByteString = printErrorT (hPutStrLn stderr) C.putStrLn
+printErrorOrString :: ErrorT String IO String -> IO ()
+printErrorOrString = printErrorT (hPutStrLn stderr) putStrLn
 
 data GetResult a = GetResult (B.ByteString, ByteOffset, a)
   deriving (Show, Eq)

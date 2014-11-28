@@ -4,6 +4,7 @@ import RocksmithPsarcIndex
 import Test.Hspec
 import System.Environment (getArgs, withArgs)
 import Control.Applicative ((<*>))
+import Control.Monad.Error
 
 main = do
   args <- getArgs
@@ -29,9 +30,8 @@ testReadPsarc psarcPath = hspec $ do
   where
     ($>=) = compareFn (>=)
     compareFn c left right b = (left b) `c` (right b)
-    shouldBeRightOfF f l r = (fmap.fmap) l (f psarcPath) >>= (`shouldBe` Right r)
+    shouldBeRightOfF f l r = runErrorT (fmap l (f psarcPath)) >>= (`shouldBe` Right r)
     shouldSatisfyRightOfF f l r =  shouldBeRightOfF f (r . l) True
 
 pairwise = zip <*> tail
 increasing xs = all (uncurry (<)) $ pairwise xs
-
